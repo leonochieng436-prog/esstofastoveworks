@@ -6,10 +6,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { COOKIE, createSession, requireAdmin } from "@/lib/auth";
+import { COOKIE, createSession, requireAdmin, requireAdminRole } from "@/lib/auth";
 import { allow } from "@/lib/ratelimit";
 import { uploadFile, uploadMany } from "@/lib/upload";
 import { SERVICE_ICON_NAMES } from "@/lib/service-icons";
+import { DEFAULT_COOKIE_CATEGORIES, isLegalPolicySlug } from "@/lib/legal-content";
 const done = () => revalidatePath("/", "layout");
 export async function login(_: unknown, fd: FormData) {
   if (!(await allow("login", 5, 900))) return "Too many attempts. Try again in 15 minutes.";
@@ -240,3 +241,60 @@ export async function deleteService(id: string, _: string, _fd: FormData) {
 }
 export async function addTestimonial(fd: FormData) { await requireAdmin(); const d = z.object({ name: z.string().min(2), body: z.string().min(5) }).parse(Object.fromEntries(fd)); await db.testimonial.create({ data: { ...d, location: opt(fd.get("location")) } }); done(); }
 export async function delTestimonial(id: string) { await requireAdmin(); await db.testimonial.delete({ where: { id } }); done(); }
+
+export async function saveLegalPolicy(fd: FormData) {
+  const session = await requireAdminRole();
+  const parsed = z.object({
+    slug: z.string(),
+    title: z.string().trim().min(3).max(120),
+    content: z.string().trim().min(100, "Policy content is too short.").max(50000, "Policy content is too long."),
+  }).safeParse(Object.fromEntries(fd));
+  if (!parsed.success) redirect(`/admin/legal?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the policy fields.")}`);
+  if (!isLegalPolicySlug(parsed.data.slug)) redirect("/admin/legal?error=Choose%20a%20valid%20policy.");
+  const { slug, title, content } = parsed.data;
+  const existing = await db.legalPolicy.findUnique({ where: { slug } });
+  if (existing?.title === title && existing.content === content) {
+    redirect(`/admin/legal?unchanged=${encodeURIComponent(slug)}`);
+  }
+  const revision = (existing?.revision ?? 0) + 1;
+  await db.$transaction(async (transaction) => {
+    await transaction.legalPolicy.upsert({
+      where: { slug },
+      create: { slug, title, content, revision },
+      update: { title, content, revision },
+    });
+    await transaction.legalPolicyRevision.create({
+      data: { policySlug: slug, title, content, revision, changedBy: session.id },
+    });
+  });
+  for (const path of [`/${slug}`, "/admin/legal"]) revalidatePath(path);
+  redirect(`/admin/legal?saved=${encodeURIComponent(slug)}`);
+}
+
+export async function saveCookieCategories(fd: FormData) {
+  await requireAdminRole();
+  const categorySchema = z.object({
+    key: z.string().min(1),
+    title: z.string().trim().min(2).max(80),
+    description: z.string().trim().min(5).max(1000),
+    essential: z.boolean(),
+    enabled: z.boolean(),
+  });
+  const parsed = z.array(categorySchema).safeParse(DEFAULT_COOKIE_CATEGORIES.map((category) => ({
+    key: category.key,
+    title: fd.get(`${category.key}Title`),
+    description: fd.get(`${category.key}Description`),
+    essential: category.essential,
+    enabled: category.essential || fd.has(`${category.key}Enabled`),
+  })));
+  if (!parsed.success) redirect(`/admin/legal?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Check the cookie categories.")}`);
+
+  await db.$transaction(parsed.data.map((category) => db.cookieCategory.upsert({
+    where: { key: category.key },
+    create: category,
+    update: category,
+  })));
+  revalidatePath("/cookie-policy");
+  revalidatePath("/admin/legal");
+  redirect("/admin/legal?categoriesSaved=1");
+}

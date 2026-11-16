@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="admin-shell">
-      <AdminNav />
+      <AdminNav role={s.role} />
       <div className="admin-workspace">
         <header className="admin-topbar">
           <div>

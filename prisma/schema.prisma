@@ -113,6 +113,8 @@ model Booking {
   attachments   String[]
   status        BookingStatus @default(PENDING)
   internalNotes String?
+  termsAcceptedAt DateTime?
+  privacyAcknowledgedAt DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -132,6 +134,8 @@ model Questionnaire {
   attachments String[]
   status      EnquiryStatus @default(NEW)
   quoteNotes  String?
+  termsAcceptedAt DateTime?
+  privacyAcknowledgedAt DateTime?
   createdAt   DateTime      @default(now())
 
   @@index([status, createdAt])
@@ -146,6 +150,8 @@ model Enquiry {
   productId String?
   product   Product?      @relation(fields: [productId], references: [id])
   status    EnquiryStatus @default(NEW)
+  termsAcceptedAt DateTime?
+  privacyAcknowledgedAt DateTime?
   createdAt DateTime      @default(now())
 }
 
@@ -205,4 +211,36 @@ model RateLimit {
   key     String   @id
   count   Int
   resetAt DateTime
+}
+
+model LegalPolicy {
+  slug      String                @id
+  title     String
+  content   String                @db.Text
+  revision  Int                   @default(1)
+  updatedAt DateTime              @updatedAt
+  revisions LegalPolicyRevision[]
+}
+
+model LegalPolicyRevision {
+  id        String      @id @default(cuid())
+  policySlug String
+  title     String
+  content   String      @db.Text
+  revision  Int
+  changedBy String
+  createdAt DateTime    @default(now())
+  policy    LegalPolicy @relation(fields: [policySlug], references: [slug], onDelete: Cascade)
+
+  @@unique([policySlug, revision])
+  @@index([policySlug, createdAt])
+}
+
+model CookieCategory {
+  key         String   @id
+  title       String
+  description String   @db.Text
+  essential   Boolean  @default(false)
+  enabled     Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
 }

@@ -9,7 +9,7 @@ module.exports = {
         ash: "#F4F2EF",
       },
       borderRadius: {
-        editorial: "1.25rem",
+        editorial: "var(--radius-editorial)",
         card: "var(--radius-card)",
       },
       fontFamily: {

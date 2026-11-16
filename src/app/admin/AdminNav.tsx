@@ -11,6 +11,7 @@ import {
   Settings2,
   Wrench,
   Flame,
+  ScrollText,
 } from "lucide-react";
 
 const links = [
@@ -23,8 +24,11 @@ const links = [
   { label: "Settings", href: "/admin/settings", icon: Settings2 },
 ];
 
-export default function AdminNav() {
+export default function AdminNav({ role }: { role: "ADMIN" | "STAFF" }) {
   const pathname = usePathname();
+  const visibleLinks = role === "ADMIN"
+    ? [...links, { label: "Legal & cookies", href: "/admin/legal", icon: ScrollText }]
+    : links;
 
   return (
     <aside className="admin-sidebar">
@@ -37,7 +41,7 @@ export default function AdminNav() {
       </Link>
       <p className="admin-nav-label">Workspace</p>
       <nav className="admin-nav" aria-label="Admin navigation">
-        {links.map(({ label, href, icon: Icon }) => {
+        {visibleLinks.map(({ label, href, icon: Icon }) => {
           const active = href === "/admin"
             ? pathname === href
             : pathname === href || pathname.startsWith(`${href}/`);

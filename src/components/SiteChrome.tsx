@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Phone } from "lucide-react";
 import { wa } from "@/lib/whatsapp";
+import CookieConsent from "@/components/CookieConsent";
+import type { CookieCategoryConfig } from "@/lib/legal-content";
 
 type SiteChromeProps = {
   site: {
@@ -15,12 +17,13 @@ type SiteChromeProps = {
     hours: string;
     tiktokUrl: string | null;
   };
+  cookieCategories: CookieCategoryConfig[];
   children: React.ReactNode;
 };
 
 const NAV = [["Home", "/"], ["Our Story", "/about"], ["Products", "/products"], ["Services", "/services"], ["Gallery", "/gallery"], ["Book a Service", "/book"], ["Contact", "/contact"]];
 
-export default function SiteChrome({ site, children }: SiteChromeProps) {
+export default function SiteChrome({ site, cookieCategories, children }: SiteChromeProps) {
   const isAdmin = usePathname()?.startsWith("/admin") ?? false;
 
   if (isAdmin) return <div className="admin-app-content">{children}</div>;
@@ -49,11 +52,28 @@ export default function SiteChrome({ site, children }: SiteChromeProps) {
             </summary>
             <nav className="absolute right-0 top-[calc(100%+0.75rem)] grid w-[min(20rem,calc(100vw-2.5rem))] gap-1 rounded-2xl border border-white/10 bg-char p-3 shadow-xl">
               {NAV.map(([label, href]) => (
-                <Link key={href} href={href} className="whitespace-nowrap rounded-lg px-4 py-3 text-sm transition-colors hover:bg-white/10 hover:text-ember">
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={(event) => {
+                    const menu = event.currentTarget.closest("details");
+                    if (menu) menu.open = false;
+                  }}
+                  className="whitespace-nowrap rounded-lg px-4 py-3 text-sm transition-colors hover:bg-white/10 hover:text-ember"
+                >
                   {label}
                 </Link>
               ))}
-              <Link href="/quote" className="btn mt-2 !whitespace-nowrap !text-xs">Request a quote</Link>
+              <Link
+                href="/quote"
+                onClick={(event) => {
+                  const menu = event.currentTarget.closest("details");
+                  if (menu) menu.open = false;
+                }}
+                className="btn mt-2 !whitespace-nowrap !text-xs"
+              >
+                Request a quote
+              </Link>
             </nav>
           </details>
         </div>
@@ -61,7 +81,7 @@ export default function SiteChrome({ site, children }: SiteChromeProps) {
       <main className="app-content">{children}</main>
       <footer className="site-footer">
         <span className="footer-watermark" aria-hidden="true">ESSTOFA</span>
-        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-12 text-sm md:grid-cols-[1.4fr_1fr_0.8fr] md:gap-10 md:px-6 md:py-16">
+        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-12 text-sm md:grid-cols-[1.4fr_1fr_0.8fr_0.8fr] md:gap-10 md:px-6 md:py-16">
           <div className="max-w-sm">
             <p className="font-display text-3xl font-semibold text-white">ESSTOFA STOVE WORKS</p>
             <p className="mt-4 leading-7">
@@ -83,14 +103,30 @@ export default function SiteChrome({ site, children }: SiteChromeProps) {
               {NAV.map(([label, href]) => <Link key={href} href={href}>{label}</Link>)}
             </div>
           </nav>
+          <nav aria-label="Legal and privacy">
+            <p className="mb-4 font-semibold text-white">Legal</p>
+            <div className="grid justify-items-start gap-2">
+              <Link href="/privacy-policy">Privacy Policy</Link>
+              <Link href="/cookie-policy">Cookie Policy</Link>
+              <Link href="/terms-and-conditions">Terms and Conditions</Link>
+              <button
+                type="button"
+                className="text-left text-ember hover:text-white focus-visible:underline"
+                onClick={() => window.dispatchEvent(new Event("esstofa:open-cookie-settings"))}
+              >
+                Cookie Settings
+              </button>
+            </div>
+          </nav>
         </div>
         <p className="relative border-t border-white/10 px-5 py-5 text-center text-xs">
           © {new Date().getFullYear()} {site.businessName}. All rights reserved.
         </p>
       </footer>
-      <a href={wa(site.phone1, "Hello Esstofa, I would like to make an enquiry.")} aria-label="Chat on WhatsApp" className="fixed bottom-5 right-5 z-40 btn !rounded-full shadow-lg">
+      <a href={wa(site.phone1, "Hello Esstofa, I would like to make an enquiry.")} aria-label="Chat on WhatsApp" className="whatsapp-float fixed bottom-5 right-5 z-40 btn !rounded-full shadow-lg">
         <Phone size={18} className="mr-2" />WhatsApp
       </a>
+      <CookieConsent categories={cookieCategories} />
     </>
   );
 }

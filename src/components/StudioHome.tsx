@@ -401,7 +401,7 @@ export default function StudioHome({
               Browse all products <ArrowRight size={16} />
             </Link>
           </div>
-          <div className="product-grid mt-6">
+          <div className="product-grid home-product-grid mt-6">
             {products.slice(0, 3).map((product) => <ProductCard key={product.slug} p={product} />)}
           </div>
           <Link href="/products" className="text-link mt-6 sm:hidden">

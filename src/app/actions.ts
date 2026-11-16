@@ -10,9 +10,12 @@ const phone = z.string().trim().regex(/^(\+?254|0)\d{9}$/, "Enter a valid Kenyan
 const base = { fullName: z.string().trim().min(2, "Enter your full name").max(80), phone, email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")), county: z.string().min(2, "Choose a county"), town: z.string().trim().min(2, "Enter your town or location") };
 const fail = (e: unknown) => (e instanceof z.ZodError ? e.issues[0].message : e instanceof Error ? e.message : "Something went wrong. Please try again.");
 const spam = (fd: FormData) => Boolean(fd.get("website"));
+const legalAcknowledgementMissing = (fd: FormData) => fd.get("legalAcknowledgement") !== "yes";
+const legalAcknowledgementMessage = "Please agree to the Terms and Conditions and acknowledge the Privacy Policy before submitting.";
 
 export async function createBooking(_: string, fd: FormData): Promise<string> {
   if (spam(fd)) return "";
+  if (legalAcknowledgementMissing(fd)) return legalAcknowledgementMessage;
   let reference = "";
   try {
     if (!(await allow("booking", 5, 3600))) return "Too many requests. Please try again later.";
@@ -20,7 +23,8 @@ export async function createBooking(_: string, fd: FormData): Promise<string> {
     if (new Date(d.date) < new Date(new Date().toDateString())) return "Please choose a date that is today or later.";
     const attachments = await uploadMany(fd, "attachments", "esstofa/bookings");
     reference = ref("BKG");
-    await db.booking.create({ data: { reference, ...d, email: d.email || null, date: new Date(d.date), attachments } });
+    const acknowledgedAt = new Date();
+    await db.booking.create({ data: { reference, ...d, email: d.email || null, date: new Date(d.date), attachments, termsAcceptedAt: acknowledgedAt, privacyAcknowledgedAt: acknowledgedAt } });
     await notify(`New booking request ${reference}`, `<p>${d.fullName}, ${d.phone}, ${d.county}/${d.town}<br>${d.service} on ${d.date} ${d.time} (${d.method})<br>${d.description}</p>`);
     if (d.email) await notify("We received your booking request", `<p>Hello ${d.fullName}, we received booking request <b>${reference}</b>. It is not confirmed until our team reviews availability and contacts you.</p>`, d.email);
   } catch (e) { return fail(e); }
@@ -28,6 +32,7 @@ export async function createBooking(_: string, fd: FormData): Promise<string> {
 }
 export async function submitQuestionnaire(type: string, _: string, fd: FormData): Promise<string> {
   if (spam(fd)) return "";
+  if (legalAcknowledgementMissing(fd)) return legalAcknowledgementMessage;
   const q = QUESTIONNAIRES[type]; if (!q) return "Unknown questionnaire.";
   let reference = "";
   try {
@@ -36,7 +41,8 @@ export async function submitQuestionnaire(type: string, _: string, fd: FormData)
     const answers: Record<string, string> = {}; for (const f of q.fields) if (f.type !== "file") { const v = String(fd.get(f.name) ?? "").trim(); if (f.required && !v) return `Please answer: ${f.label}`; if (v) answers[f.label] = v.slice(0, 1500); }
     const attachments = await uploadMany(fd, "attachments", "esstofa/quotes");
     reference = ref("ENQ");
-    await db.questionnaire.create({ data: { reference, type, ...c, email: c.email || null, answers, attachments } });
+    const acknowledgedAt = new Date();
+    await db.questionnaire.create({ data: { reference, type, ...c, email: c.email || null, answers, attachments, termsAcceptedAt: acknowledgedAt, privacyAcknowledgedAt: acknowledgedAt } });
     await notify(`New ${q.title} request ${reference}`, `<p>${c.fullName}, ${c.phone}, ${c.county}/${c.town}</p><pre>${JSON.stringify(answers, null, 1)}</pre>`);
     if (c.email) await notify("We received your quotation request", `<p>Hello ${c.fullName}, your enquiry reference is <b>${reference}</b>. We will review it and contact you.</p>`, c.email);
   } catch (e) { return fail(e); }
@@ -44,10 +50,12 @@ export async function submitQuestionnaire(type: string, _: string, fd: FormData)
 }
 export async function createEnquiry(_: string, fd: FormData): Promise<string> {
   if (spam(fd)) return "";
+  if (legalAcknowledgementMissing(fd)) return legalAcknowledgementMessage;
   try {
     if (!(await allow("enquiry", 8, 3600))) return "Too many messages. Please try again later.";
     const d = z.object({ fullName: base.fullName, phone, email: base.email, message: z.string().trim().min(5, "Write a short message").max(1500), productId: z.string().optional() }).parse(Object.fromEntries(fd));
-    await db.enquiry.create({ data: { ...d, email: d.email || null, productId: d.productId || null } });
+    const acknowledgedAt = new Date();
+    await db.enquiry.create({ data: { ...d, email: d.email || null, productId: d.productId || null, termsAcceptedAt: acknowledgedAt, privacyAcknowledgedAt: acknowledgedAt } });
     await notify("New website enquiry", `<p>${d.fullName}, ${d.phone}<br>${d.message}</p>`);
   } catch (e) { return fail(e); }
   return "Thank you. We have received your message and will contact you shortly.";

@@ -1,6 +1,6 @@
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ADMIN_SESSION_COOKIE, ADMIN_SESSION_SECONDS, getAuthKey, isAdminRole, verifyAdminToken } from "./auth-config";
 export const COOKIE = ADMIN_SESSION_COOKIE;
 export async function createSession(id: string, role: string) {
@@ -22,3 +22,8 @@ export async function getSession() {
   return verifyAdminToken((await cookies()).get(COOKIE)?.value);
 }
 export async function requireAdmin() { const s = await getSession(); if (!s) redirect("/admin/login"); return s; }
+export async function requireAdminRole() {
+  const session = await requireAdmin();
+  if (session.role !== "ADMIN") notFound();
+  return session;
+}
